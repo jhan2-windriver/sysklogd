@@ -369,6 +369,8 @@ int usage(int code)
 	       "  -r S[:R]  Enable log rotation. The size argument (S) takes k/M/G qualifiers,\n"
 	       "            e.g. 2M for 2 MiB.  The optional rotations argument default to 5.\n"
 	       "            Rotation can also be defined per log file in %s\n"
+	       "  -S        Get ux socket from parent process in fd 3, to avoid log missing in\n"
+	       "            syslog at early boot up.\n"
 	       "  -s        Operate in secure mode, do not log messages from remote machines.\n"
 	       "            If specified twice, no socket at all will be opened, which also\n"
 	       "            disables support for logging to remote machines.\n"
@@ -392,10 +394,11 @@ int main(int argc, char *argv[])
 	int no_sys = 0;
 	int pflag = 0;
 	int bflag = 0;
+	int sflag = 0;
 	char *ptr;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "468Aa:b:C:dHFf:Kkm:nP:p:r:sTtv?")) != EOF) {
+	while ((ch = getopt(argc, argv, "468Aa:b:C:dHFf:Kkm:nP:p:r:SsTtv?")) != EOF) {
 		switch ((char)ch) {
 		case '4':
 			family = PF_INET;
@@ -487,6 +490,12 @@ int main(int argc, char *argv[])
 			parse_rotation(optarg, &RotateSz, &RotateCnt);
 			break;
 
+		case 'S': /* get ux socket from parent process in fd 3 */
+			sflag = 1;
+			if (socket_register(3, NULL, unix_cb, NULL) < 0)
+				err(1, "Failed to register fd 3");
+			break;
+
 		case 's':
 			secure_opt++;
 			break;
@@ -522,7 +531,7 @@ int main(int argc, char *argv[])
 			});
 
 	/* Default to _PATH_LOG for the UNIX domain socket */
-	if (!pflag)
+	if (!pflag && !sflag)
 		addpeer(&(struct peer) {
 				.pe_name = _PATH_LOG,
 				.pe_mode = 0666,
